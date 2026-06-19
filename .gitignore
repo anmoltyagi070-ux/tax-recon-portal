@@ -1,0 +1,5 @@
+node_modules/
+src-tauri/target/
+final_state_backup/
+build_git_history.py
+.DS_Store
