@@ -1,0 +1,25 @@
+# Netlify Deployment Configuration Context
+# This file tells Netlify how to build and host the Single Page Application.
+
+[build]
+  # The directory containing the production-ready static assets
+  publish = "dist"
+
+  # No build command is necessary since our files are pre-compiled and placed in dist/
+  command = "echo 'Static build assets ready'"
+
+# Redirect rule to ensure that any client-side routing is handled correctly by index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
+# HTTP Security and Cache Control Headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "same-origin"
+    Content-Security-Policy = "default-src 'self' https://img.icons8.com https://fonts.googleapis.com https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; img-src 'self' data: https://img.icons8.com;"

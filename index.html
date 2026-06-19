@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GSTR Tax Reconciliation & D6 Audit Portal</title>
+  
+  <!-- SEO tags -->
+  <meta name="description" content="Automated GSTR tax reconciliation system and corporate Para D6 audit ledger consolidation portal.">
+  <meta name="keywords" content="GST, GSTR-3B, Tax Reconciliation, Cost Audit, D6 Matrix, Excel export">
+  <meta name="author" content="Antigravity Developer Team">
+  
+  <!-- CSS Styles -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- External JS Libraries via CDN -->
+  <!-- PDF.js for client-side PDF text extraction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- jsPDF for client-side PDF generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- SheetJS for multi-sheet styled Excel sheet generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- JSZip and FileSaver for packaging and downloading mock PDFs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+
+  <!-- Glassmorphic Header -->
+  <header>
+    <div class="brand">
+      <i class="fa-solid fa-file-invoice-dollar"></i>
+      <h1>GSTR Tax Reconciliation & D6 Audit Portal</h1>
+    </div>
+    <div class="header-meta">
+      <span><i class="fa-solid fa-calendar-days"></i> Period: <b>FY 2025-26</b></span>
+      <span><i class="fa-solid fa-clock"></i> Local Time: <b>10:50 AM</b></span>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main>
+    
+    <!-- Sidebar Control Panel -->
+    <div class="sidebar">
+      
+      <!-- Ingestion Uploader Card -->
+      <div class="card">
+        <div class="card-title">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>1. Ingest GSTR-3B PDFs</span>
+        </div>
+        <div class="upload-zone" id="dropzone">
+          <i class="fa-solid fa-file-pdf upload-icon"></i>
+          <p>Drag & drop GSTR-3B PDFs</p>
+          <span>Supports up to 12 files (one per month)</span>
+          <input type="file" id="file-input" multiple accept=".pdf">
+        </div>
+      </div>
+      
+      <!-- Ingestion Progress Panel -->
+      <div class="card" id="progress-container">
+        <div class="card-title">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <span>Ingestion Progress</span>
+        </div>
+        <div id="progress-text">Analyzing upload files...</div>
+        <div class="progress-bar-bg">
+          <div id="progress-bar-fill"></div>
+        </div>
+      </div>
+      
+      <!-- Uploaded Files Status Card -->
+      <div class="card">
+        <div class="card-title">
+          <i class="fa-solid fa-folder-open"></i>
+          <span>2. Period Ledgers Loaded</span>
+        </div>
+        <div class="file-list" id="uploaded-files-list">
+          <div class="empty-state" style="padding: 1.5rem 0; font-size: 0.8rem;">
+            No periods parsed. Please upload PDFs or run the simulated sandbox below.
+          </div>
+        </div>
+      </div>
+      
+      <!-- Simulated Control Sandbox Card -->
+      <div class="card">
+        <div class="card-title">
+          <i class="fa-solid fa-flask"></i>
+          <span>3. Simulation Sandbox</span>
+        </div>
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">
+          Don't have 12 GSTR-3B files? Load our high-fidelity pre-compiled data, or generate a ZIP of 12 GSTR-3B PDFs locally.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <button class="btn btn-secondary" onclick="loadSampleDataAndProcess()">
+            <i class="fa-solid fa-bolt"></i> Load 12 Months Sample Data
+          </button>
+          <button class="btn btn-secondary" onclick="downloadAllSamplePDFs()">
+            <i class="fa-solid fa-file-zipper"></i> Generate 12 Sample PDFs
+          </button>
+        </div>
+      </div>
+      
+    </div>
+    
+    <!-- Main Dashboard Section -->
+    <div class="dashboard-content">
+      
+      <!-- Executive KPI board -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Duties/Taxes Payable</div>
+          <div class="kpi-value" id="kpi-payable">₹ 0.00</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Duties/Taxes Paid</div>
+          <div class="kpi-value" id="kpi-paid" style="color: var(--accent-blue);">₹ 0.00</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Net Reconciliation Diff (Row 32)</div>
+          <div class="kpi-value" id="kpi-diff">₹ 0.00</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Audit Compliance Status</div>
+          <div class="kpi-value" id="kpi-status">
+            <span class="status-fail"><i class="fa-solid fa-triangle-exclamation"></i> NO DATA</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Variance Warning Banner -->
+      <div id="variance-warning-banner" class="variance-alert-banner" style="display: none;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span><b>Variance Mismatch Alert:</b> There is a discrepancy between Total Duties/Taxes Payable and Paid. Please inspect the difference row on the <b>Para D6 Statement</b> tab.</span>
+      </div>
+      
+      <!-- Interactive Navigation Tabs -->
+      <div class="tab-navigation">
+        <button class="tab-btn active" data-tab="uploader" onclick="switchTab('uploader')">
+          <i class="fa-solid fa-house"></i> Overview & Guide
+        </button>
+        <button class="tab-btn" data-tab="raw_data" onclick="switchTab('raw_data')">
+          <i class="fa-solid fa-list"></i> Raw Consolidated
+        </button>
+        <button class="tab-btn" data-tab="payable_data" onclick="switchTab('payable_data')">
+          <i class="fa-solid fa-filter"></i> First Filter: Payable
+        </button>
+        <button class="tab-btn" data-tab="outputs" onclick="switchTab('outputs')">
+          <i class="fa-solid fa-arrows-split-up-and-left"></i> Second Filter: Segmented
+        </button>
+        <button class="tab-btn" data-tab="d6_matrix" onclick="switchTab('d6_matrix')">
+          <i class="fa-solid fa-table-cells"></i> Para D6 Statement
+        </button>
+      </div>
+      
+      <!-- TAB VIEW 1: Overview and User Instructions -->
+      <div class="tab-view active" id="view-uploader">
+        <div class="card" style="padding: 2.5rem;">
+          <h2 style="margin-bottom: 1rem; color: var(--accent-cyan);">Welcome to the Accounting and Tax Reconciliation Portal</h2>
+          <p style="color: var(--text-secondary); margin-bottom: 1.5rem; max-width: 900px;">
+            This system automates the multi-stage tax auditing and reconciliation pipeline. It digests GSTR-3B filings across 12 monthly periods, appends raw files, filters out payable liabilities, segments the data by forward vs reverse charge mechanisms, and compiles a finished <b>Para D6 Reconciliation Matrix</b> sheet with native spreadsheet formulas.
+          </p>
+          
+          <h3 style="margin-bottom: 0.75rem; color: var(--accent-blue);">Process Pipeline Stages</h3>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+            <div class="card" style="background-color: rgba(11, 19, 43, 0.4);">
+              <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">1. Consolidation</h4>
+              <p style="font-size: 0.8rem; color: var(--text-muted);">
+                Parses outward liability tables from 12 PDFs and compiles them into a unified chronological master ledger.
+              </p>
+            </div>
+            <div class="card" style="background-color: rgba(11, 19, 43, 0.4);">
+              <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">2. Filtering & Segmentation</h4>
+              <p style="font-size: 0.8rem; color: var(--text-muted);">
+                Filters GSTR Table 3.1 sections <b>(a) to (e)</b>, and splits them into Output A (Forward Charge) and Output B (RCM).
+              </p>
+            </div>
+            <div class="card" style="background-color: rgba(11, 19, 43, 0.4);">
+              <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">3. Reporting & Excel</h4>
+              <p style="font-size: 0.8rem; color: var(--text-muted);">
+                Builds dynamic Pivot summaries and the Para D6 matrix with live Excel formulas for spreadsheet exports.
+              </p>
+            </div>
+          </div>
+          
+          <div style="background-color: rgba(6, 182, 212, 0.05); padding: 1.5rem; border-radius: var(--border-radius-md); border-left: 4px solid var(--accent-cyan);">
+            <h4 style="color: var(--accent-cyan); margin-bottom: 0.5rem;"><i class="fa-solid fa-circle-info"></i> How to Get Started Immediately</h4>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+              Click <b>"Load 12 Months Sample Data"</b> in the sidebar simulation card to immediately populate the tables, chart elements, and D6 sheet with structured financial figures.
+            </p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary);">
+              Alternatively, click <b>"Generate 12 Sample PDFs"</b>, save the generated ZIP file, extract it, and drop the resulting 12 GSTR-3B PDF files into the drag-and-drop zone to evaluate the local text parsing engines.
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- TAB VIEW 2: Raw Consolidated Table -->
+      <div class="tab-view" id="view-raw_data">
+        <div class="card">
+          <div class="card-title">
+            <i class="fa-solid fa-rectangle-list"></i>
+            <span>Raw Consolidated Master Ledger (Combined 12 Period PDF Outputs)</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Source File</th>
+                  <th>Classification</th>
+                  <th class="text-left">Nature of Supplies</th>
+                  <th class="text-right">Taxable Value</th>
+                  <th class="text-right">IGST</th>
+                  <th class="text-right">CGST</th>
+                  <th class="text-right">SGST</th>
+                  <th class="text-right">Cess</th>
+                </tr>
+              </thead>
+              <tbody id="raw-table-body">
+                <tr>
+                  <td colspan="9" class="empty-state">No raw data consolidated. Load sample data or upload files in sidebar.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- TAB VIEW 3: Filtered Payable Portion -->
+      <div class="tab-view" id="view-payable_data">
+        <div class="card">
+          <div class="card-title">
+            <i class="fa-solid fa-filter"></i>
+            <span>First Stage Filtered Data: Payable Classification (GSTR-3B 3.1 Rows a to e)</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Source File</th>
+                  <th>Classification</th>
+                  <th class="text-left">Nature of Supplies</th>
+                  <th class="text-right">Taxable Value</th>
+                  <th class="text-right">IGST</th>
+                  <th class="text-right">CGST</th>
+                  <th class="text-right">SGST</th>
+                  <th class="text-right">Cess</th>
+                </tr>
+              </thead>
+              <tbody id="payable-table-body">
+                <tr>
+                  <td colspan="9" class="empty-state">No filtered data. Please initiate ingestion.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- TAB VIEW 4: Segmented Outputs & Pivot Tables -->
+      <div class="tab-view" id="view-outputs">
+        <div class="outputs-grid">
+          
+          <!-- Output A Card -->
+          <div class="card">
+            <div class="card-title">
+              <i class="fa-solid fa-truck"></i>
+              <span>Output A: Pivot Summary (Forward Charge - 3.1a, b, c, e)</span>
+            </div>
+            <div class="table-container" id="pivot-a-container">
+              <div class="empty-state">No Output A pivot table available.</div>
+            </div>
+          </div>
+          
+          <!-- Output B Card -->
+          <div class="card">
+            <div class="card-title">
+              <i class="fa-solid fa-hand-holding-dollar"></i>
+              <span>Output B: Pivot Summary (Reverse Charge - 3.1d)</span>
+            </div>
+            <div class="table-container" id="pivot-b-container">
+              <div class="empty-state">No Output B pivot table available.</div>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+      <!-- TAB VIEW 5: D6 Reconciliation Statement -->
+      <div class="tab-view" id="view-d6_matrix">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+          <div>
+            <h3 style="color: var(--accent-cyan);"><i class="fa-solid fa-table"></i> GSTR Para D6 Reconciliation Matrix</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">
+              Adjust any ledger values directly in the grid. Total sums and difference calculations will update dynamically in real time.
+            </p>
+          </div>
+          <button class="btn btn-accent" onclick="exportExcelReport()" style="width: auto; padding: 0.75rem 2rem;">
+            <i class="fa-solid fa-file-excel"></i> Download Excel Summary
+          </button>
+        </div>
+        
+        <div class="d6-matrix-container" id="d6-matrix-container">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+        
+        <div style="background-color: rgba(251, 191, 36, 0.05); padding: 1.25rem; border-radius: var(--border-radius-md); border-left: 4px solid var(--accent-yellow); font-size: 0.8rem; color: var(--text-secondary); display: flex; gap: 0.75rem; align-items: center;">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.25rem; color: var(--accent-yellow);"></i>
+          <span>
+            <b>Reconciliation Note</b>: Columns C (Taxable Value) and D (Excise/VAT/Other State Taxes) are shaded out for Input Tax Credit rows, in accordance with regulatory filing specifications. Highlighting row 32 checks if all calculated liabilities have been properly discharged.
+          </span>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+
+  <!-- Footer block -->
+  <footer>
+    <p>&copy; 2026 GSTR Tax Reconciliation System. Developed by Antigravity under Advanced Agentic Coding. All rights reserved.</p>
+  </footer>
+
+  <!-- Set PDF.js Worker Location -->
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+  
+  <!-- App and Data files -->
+  <script src="sample_data.js"></script>
+  <script src="app.js"></script>
+  
+  <!-- UI Helper scripts -->
+  <script>
+    // Handle list displaying of uploaded files reactive to state
+    const originalHandleFiles = window.handleUploadedFiles;
+    window.handleUploadedFiles = async function(fileList) {
+      await originalHandleFiles(fileList);
+      renderFileList();
+    };
+
+    const originalLoadMock = window.loadSampleDataAndProcess;
+    window.loadSampleDataAndProcess = async function() {
+      await originalLoadMock();
+      renderFileList();
+    };
+
+    function renderFileList() {
+      const container = document.getElementById('uploaded-files-list');
+      if (!container) return;
+      container.innerHTML = '';
+      
+      if (window.appState.files.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding: 1.5rem 0; font-size: 0.8rem;">No periods parsed. Please upload PDFs or run the simulated sandbox below.</div>';
+        return;
+      }
+      
+      window.appState.files.forEach(f => {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.innerHTML = `
+          <div class="file-info">
+            <i class="fa-solid fa-file-pdf" style="color: var(--accent-red); font-size: 1rem;"></i>
+            <div style="min-width: 0;">
+              <div class="file-name" title="${f.name}">${f.name}</div>
+              <div class="file-size">${(f.size/1024).toFixed(1)} KB</div>
+            </div>
+          </div>
+          <div class="file-status">${f.status}</div>
+        `;
+        container.appendChild(item);
+      });
+    }
+  </script>
+</body>
+</html>
