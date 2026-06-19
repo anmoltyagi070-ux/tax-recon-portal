@@ -1,0 +1,12 @@
+{
+  "name": "tax-recon-desktop",
+  "version": "1.0.0",
+  "description": "GSTR Tax Reconciliation & D6 Audit Portal Desktop App",
+  "main": "index.html",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^1.5.14"
+  }
+}
