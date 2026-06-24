@@ -284,6 +284,45 @@ window.generateGstr3bMockPdfBlob = function(monthData) {
     currentY += 10;
   });
   
+  // Draw Table 5.1: Interest & Late fee payable
+  currentY += 10;
+  doc.setFontSize(11);
+  doc.setTextColor(26, 54, 93);
+  doc.setFont("helvetica", "bold");
+  doc.text("5.1 Interest & Late fee payable", 14, currentY);
+  
+  currentY += 4;
+  doc.setFillColor(100, 110, 120);
+  doc.rect(14, currentY, 182, 10, 'F');
+  doc.setFontSize(8);
+  doc.setTextColor(255, 255, 255);
+  doc.text("Description", 16, currentY + 7);
+  doc.text("Integrated Tax", 85, currentY + 7);
+  doc.text("Central Tax", 115, currentY + 7);
+  doc.text("State/UT Tax", 145, currentY + 7);
+  doc.text("Cess", 175, currentY + 7);
+  
+  doc.setTextColor(0, 0, 0);
+  
+  // Row 1: Interest
+  currentY += 10;
+  doc.setDrawColor(226, 232, 240);
+  doc.line(14, currentY + 10, 196, currentY + 10);
+  doc.text("Interest", 16, currentY + 6);
+  doc.text(monthData.t51.interest.igst.toFixed(2), 85, currentY + 6);
+  doc.text(monthData.t51.interest.cgst.toFixed(2), 115, currentY + 6);
+  doc.text(monthData.t51.interest.sgst.toFixed(2), 145, currentY + 6);
+  doc.text(monthData.t51.interest.cess.toFixed(2), 175, currentY + 6);
+  
+  // Row 2: Late fee
+  currentY += 10;
+  doc.line(14, currentY + 10, 196, currentY + 10);
+  doc.text("Late fee", 16, currentY + 6);
+  doc.text(monthData.t51.latefee.igst.toFixed(2), 85, currentY + 6);
+  doc.text(monthData.t51.latefee.cgst.toFixed(2), 115, currentY + 6);
+  doc.text(monthData.t51.latefee.sgst.toFixed(2), 145, currentY + 6);
+  doc.text(monthData.t51.latefee.cess.toFixed(2), 175, currentY + 6);
+
   // Draw Table 6.1: Payment of Tax (simplified to extract cash/itc)
   currentY += 10;
   doc.setFontSize(11);
@@ -325,3 +364,24 @@ window.generateGstr3bMockPdfBlob = function(monthData) {
   
   return doc.output('blob');
 };
+
+// Inject mock Table 5.1 data for all periods if not present
+window.GSTR_SAMPLE_DATA.forEach((period, idx) => {
+  const monthNum = idx + 1;
+  if (!period.t51) {
+    period.t51 = {
+      interest: {
+        igst: Math.round(100.0 * monthNum * 100) / 100,
+        cgst: Math.round(50.0 * monthNum * 100) / 100,
+        sgst: Math.round(50.0 * monthNum * 100) / 100,
+        cess: 0.00
+      },
+      latefee: {
+        igst: 0.00,
+        cgst: Math.round(25.0 * monthNum * 100) / 100,
+        sgst: Math.round(25.0 * monthNum * 100) / 100,
+        cess: 0.00
+      }
+    };
+  }
+});

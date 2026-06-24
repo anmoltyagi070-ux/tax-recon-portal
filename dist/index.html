@@ -16,16 +16,15 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- External JS Libraries via CDN -->
-  <!-- PDF.js for client-side PDF text extraction -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Local Runtime JS Libraries (Offline and CORS friendly) -->
+  <script src="lib/pdf.min.js"></script>
   <!-- jsPDF for client-side PDF generation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="lib/jspdf.umd.min.js"></script>
   <!-- SheetJS for multi-sheet styled Excel sheet generation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="lib/xlsx.full.min.js"></script>
   <!-- JSZip and FileSaver for packaging and downloading mock PDFs -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="lib/jszip.min.js"></script>
+  <script src="lib/FileSaver.min.js"></script>
 </head>
 <body>
 
@@ -154,6 +153,9 @@
         </button>
         <button class="tab-btn" data-tab="d6_matrix" onclick="switchTab('d6_matrix')">
           <i class="fa-solid fa-table-cells"></i> Para D6 Statement
+        </button>
+        <button class="tab-btn" data-tab="debug_logs" onclick="switchTab('debug_logs')">
+          <i class="fa-solid fa-bug"></i> Values Fetched
         </button>
       </div>
       
@@ -318,6 +320,22 @@
         </div>
       </div>
       
+      <!-- TAB VIEW 6: Values Fetched / Extracted Debug Logs -->
+      <div class="tab-view" id="view-debug_logs">
+        <div class="card">
+          <div class="card-title">
+            <i class="fa-solid fa-bug"></i>
+            <span>Values Fetched & Extracted Text (For Audit Verification)</span>
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+            This panel displays the exact text lines extracted from each processed PDF document and the parsed table values for audit tracing.
+          </p>
+          <div id="debug-logs-container" style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div class="empty-state">No PDF files parsed yet. Upload files or load sample data in the sidebar.</div>
+          </div>
+        </div>
+      </div>
+      
     </div>
   </main>
 
@@ -328,12 +346,12 @@
 
   <!-- Set PDF.js Worker Location -->
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
   </script>
   
-  <!-- App and Data files -->
-  <script src="sample_data.js"></script>
-  <script src="app.js"></script>
+  <!-- App and Data files (with cache busters) -->
+  <script src="sample_data.js?v=20260622"></script>
+  <script src="app.js?v=20260622"></script>
   
   <!-- UI Helper scripts -->
   <script>

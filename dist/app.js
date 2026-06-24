@@ -65,108 +65,147 @@ function populateD6FromConsolidated() {
   // Reset
   initD6Values();
   
-  // Aggregate Output A (Channel A) and Output B (Channel B)
-  const aggregates = {
-    "ChannelA": { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
-    "ChannelB": { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 }
+  const getSum = (keys) => {
+    if (!Array.isArray(keys)) {
+      keys = [keys];
+    }
+    const total = { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 };
+    window.appState.extractedPeriods.forEach(p => {
+      keys.forEach(key => {
+        const vals = p.data[key] || { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 };
+        total.taxable = Math.round((total.taxable + (vals.taxable || 0.00)) * 100) / 100;
+        total.igst = Math.round((total.igst + (vals.igst || 0.00)) * 100) / 100;
+        total.cgst = Math.round((total.cgst + (vals.cgst || 0.00)) * 100) / 100;
+        total.sgst = Math.round((total.sgst + (vals.sgst || 0.00)) * 100) / 100;
+        total.cess = Math.round((total.cess + (vals.cess || 0.00)) * 100) / 100;
+      });
+    });
+    return [
+      parseFloat(total.taxable.toFixed(2)),
+      0.00, // Excise Duty/VAT
+      parseFloat(total.cgst.toFixed(2)),
+      parseFloat(total.sgst.toFixed(2)),
+      parseFloat(total.igst.toFixed(2)),
+      parseFloat(total.cess.toFixed(2))
+    ];
   };
   
-  window.appState.outputA.forEach(row => {
-    aggregates.ChannelA.taxable = Math.round((aggregates.ChannelA.taxable + row.taxable) * 100) / 100;
-    aggregates.ChannelA.igst = Math.round((aggregates.ChannelA.igst + row.igst) * 100) / 100;
-    aggregates.ChannelA.cgst = Math.round((aggregates.ChannelA.cgst + row.cgst) * 100) / 100;
-    aggregates.ChannelA.sgst = Math.round((aggregates.ChannelA.sgst + row.sgst) * 100) / 100;
-    aggregates.ChannelA.cess = Math.round((aggregates.ChannelA.cess + row.cess) * 100) / 100;
-  });
+  // Initialize the cross-utilization matrix and cash payments
+  const itcMatrix = {
+    cgst: { cgst: 0.00, sgst: 0.00, igst: 0.00, cess: 0.00 },
+    sgst: { cgst: 0.00, sgst: 0.00, igst: 0.00, cess: 0.00 },
+    igst: { cgst: 0.00, sgst: 0.00, igst: 0.00, cess: 0.00 },
+    cess: { cgst: 0.00, sgst: 0.00, igst: 0.00, cess: 0.00 }
+  };
   
-  window.appState.outputB.forEach(row => {
-    aggregates.ChannelB.taxable = Math.round((aggregates.ChannelB.taxable + row.taxable) * 100) / 100;
-    aggregates.ChannelB.igst = Math.round((aggregates.ChannelB.igst + row.igst) * 100) / 100;
-    aggregates.ChannelB.cgst = Math.round((aggregates.ChannelB.cgst + row.cgst) * 100) / 100;
-    aggregates.ChannelB.sgst = Math.round((aggregates.ChannelB.sgst + row.sgst) * 100) / 100;
-    aggregates.ChannelB.cess = Math.round((aggregates.ChannelB.cess + row.cess) * 100) / 100;
-  });
-  
-  // Format floats
-  Object.keys(aggregates).forEach(k => {
-    aggregates[k].taxable = parseFloat(aggregates[k].taxable.toFixed(2));
-    aggregates[k].igst = parseFloat(aggregates[k].igst.toFixed(2));
-    aggregates[k].cgst = parseFloat(aggregates[k].cgst.toFixed(2));
-    aggregates[k].sgst = parseFloat(aggregates[k].sgst.toFixed(2));
-    aggregates[k].cess = parseFloat(aggregates[k].cess.toFixed(2));
-  });
-  
-  // Aggregate payments (ITC Utilised and Cash Paid) from parsed periods
-  const payments = {
-    cgst: { itc: 0.00, cash: 0.00 },
-    sgst: { itc: 0.00, cash: 0.00 },
-    igst: { itc: 0.00, cash: 0.00 },
-    cess: { itc: 0.00, cash: 0.00 }
+  const cashPayments = {
+    cgst: 0.00,
+    sgst: 0.00,
+    igst: 0.00,
+    cess: 0.00
   };
   
   window.appState.extractedPeriods.forEach(p => {
     if (p.payment) {
-      payments.cgst.itc = Math.round((payments.cgst.itc + (p.payment.itc.cgst || 0.00)) * 100) / 100;
-      payments.sgst.itc = Math.round((payments.sgst.itc + (p.payment.itc.sgst || 0.00)) * 100) / 100;
-      payments.igst.itc = Math.round((payments.igst.itc + (p.payment.itc.igst || 0.00)) * 100) / 100;
-      payments.cess.itc = Math.round((payments.cess.itc + (p.payment.itc.cess || 0.00)) * 100) / 100;
+      const itc = p.payment.itc;
+      const cash = p.payment.cash;
       
-      payments.cgst.cash = Math.round((payments.cgst.cash + (p.payment.cash.cgst || 0.00)) * 100) / 100;
-      payments.sgst.cash = Math.round((payments.sgst.cash + (p.payment.cash.sgst || 0.00)) * 100) / 100;
-      payments.igst.cash = Math.round((payments.igst.cash + (p.payment.cash.igst || 0.00)) * 100) / 100;
-      payments.cess.cash = Math.round((payments.cess.cash + (p.payment.cash.cess || 0.00)) * 100) / 100;
+      const taxTypes = ['cgst', 'sgst', 'igst', 'cess'];
+      
+      taxTypes.forEach(liab => {
+        taxTypes.forEach(itcType => {
+          let val = 0.00;
+          if (itc && itc[liab]) {
+            if (typeof itc[liab] === 'object') {
+              val = itc[liab][itcType] || 0.00;
+            } else if (liab === itcType) {
+              val = itc[liab] || 0.00;
+            }
+          }
+          itcMatrix[itcType][liab] = Math.round((itcMatrix[itcType][liab] + val) * 100) / 100;
+        });
+      });
+      
+      if (cash) {
+        cashPayments.cgst = Math.round((cashPayments.cgst + (cash.cgst || 0.00)) * 100) / 100;
+        cashPayments.sgst = Math.round((cashPayments.sgst + (cash.sgst || 0.00)) * 100) / 100;
+        cashPayments.igst = Math.round((cashPayments.igst + (cash.igst || 0.00)) * 100) / 100;
+        cashPayments.cess = Math.round((cashPayments.cess + (cash.cess || 0.00)) * 100) / 100;
+      }
     }
   });
+
+  const t51Sums = {
+    cgst: 0.00,
+    sgst: 0.00,
+    igst: 0.00,
+    cess: 0.00
+  };
+  
+  window.appState.extractedPeriods.forEach(p => {
+    if (p.t51) {
+      const interest = p.t51.interest;
+      const latefee = p.t51.latefee;
+      if (interest) {
+        t51Sums.cgst += (interest.cgst || 0.00);
+        t51Sums.sgst += (interest.sgst || 0.00);
+        t51Sums.igst += (interest.igst || 0.00);
+        t51Sums.cess += (interest.cess || 0.00);
+      }
+      if (latefee) {
+        t51Sums.cgst += (latefee.cgst || 0.00);
+        t51Sums.sgst += (latefee.sgst || 0.00);
+        t51Sums.igst += (latefee.igst || 0.00);
+        t51Sums.cess += (latefee.cess || 0.00);
+      }
+    }
+  });
+  
+  t51Sums.cgst = Math.round(t51Sums.cgst * 100) / 100;
+  t51Sums.sgst = Math.round(t51Sums.sgst * 100) / 100;
+  t51Sums.igst = Math.round(t51Sums.igst * 100) / 100;
+  t51Sums.cess = Math.round(t51Sums.cess * 100) / 100;
 
   // Assign to D6
   D6_ROWS.forEach(row => {
     if (row.type === 'data') {
       if (row.mapKey === '3.1(a)') {
-        // Row 8 maps Channel A aggregated data (Sum of Taxable Value from Output A)
-        window.appState.d6Values[row.label] = [
-          aggregates.ChannelA.taxable,
-          0.00,
-          aggregates.ChannelA.cgst,
-          aggregates.ChannelA.sgst,
-          aggregates.ChannelA.igst,
-          aggregates.ChannelA.cess
-        ];
+        window.appState.d6Values[row.label] = getSum(["3.1(a)", "3.1.1(ii)"]);
       } else if (row.mapKey === '3.1(d)') {
-        // Row 10 maps Channel B aggregated data (Sum of Taxable Value from Output B)
-        window.appState.d6Values[row.label] = [
-          aggregates.ChannelB.taxable,
-          0.00,
-          aggregates.ChannelB.cgst,
-          aggregates.ChannelB.sgst,
-          aggregates.ChannelB.igst,
-          aggregates.ChannelB.cess
-        ];
+        window.appState.d6Values[row.label] = getSum(["3.1(d)", "3.1.1(i)"]);
       } else if (row.mapKey) {
-        // Other outward rows (9, 11, 12) default to 0.00
-        window.appState.d6Values[row.label] = [0.00, 0.00, 0.00, 0.00, 0.00, 0.00];
+        window.appState.d6Values[row.label] = getSum(row.mapKey);
       } else if (row.category === 'payment') {
         // Payment / ITC utilized
         let val = [0.00, 0.00, 0.00, 0.00, 0.00, 0.00];
         if (row.component === 'cgst') {
-          val = [0.00, 0.00, parseFloat(payments.cgst.itc.toFixed(2)), 0.00, 0.00, 0.00];
+          val = [0.00, 0.00, parseFloat(itcMatrix.cgst.cgst.toFixed(2)), parseFloat(itcMatrix.cgst.sgst.toFixed(2)), parseFloat(itcMatrix.cgst.igst.toFixed(2)), parseFloat(itcMatrix.cgst.cess.toFixed(2))];
         } else if (row.component === 'sgst') {
-          val = [0.00, 0.00, 0.00, parseFloat(payments.sgst.itc.toFixed(2)), 0.00, 0.00];
+          val = [0.00, 0.00, parseFloat(itcMatrix.sgst.cgst.toFixed(2)), parseFloat(itcMatrix.sgst.sgst.toFixed(2)), parseFloat(itcMatrix.sgst.igst.toFixed(2)), parseFloat(itcMatrix.sgst.cess.toFixed(2))];
         } else if (row.component === 'igst') {
-          val = [0.00, 0.00, 0.00, 0.00, parseFloat(payments.igst.itc.toFixed(2)), 0.00];
+          val = [0.00, 0.00, parseFloat(itcMatrix.igst.cgst.toFixed(2)), parseFloat(itcMatrix.igst.sgst.toFixed(2)), parseFloat(itcMatrix.igst.igst.toFixed(2)), parseFloat(itcMatrix.igst.cess.toFixed(2))];
         } else if (row.component === 'cess') {
-          val = [0.00, 0.00, 0.00, 0.00, 0.00, parseFloat(payments.cess.itc.toFixed(2))];
+          val = [0.00, 0.00, parseFloat(itcMatrix.cess.cgst.toFixed(2)), parseFloat(itcMatrix.cess.sgst.toFixed(2)), parseFloat(itcMatrix.cess.igst.toFixed(2)), parseFloat(itcMatrix.cess.cess.toFixed(2))];
         } else if (row.component === 'cash') {
-          // Total cash ledger payments across CGST, SGST, IGST, Cess
           val = [
             0.00,
             0.00,
-            parseFloat(payments.cgst.cash.toFixed(2)),
-            parseFloat(payments.sgst.cash.toFixed(2)),
-            parseFloat(payments.igst.cash.toFixed(2)),
-            parseFloat(payments.cess.cash.toFixed(2))
+            parseFloat(cashPayments.cgst.toFixed(2)),
+            parseFloat(cashPayments.sgst.toFixed(2)),
+            parseFloat(cashPayments.igst.toFixed(2)),
+            parseFloat(cashPayments.cess.toFixed(2))
           ];
         }
         window.appState.d6Values[row.label] = val;
+      } else if (row.component === 'interest') {
+        window.appState.d6Values[row.label] = [
+          0.00,
+          0.00,
+          parseFloat(t51Sums.cgst.toFixed(2)),
+          parseFloat(t51Sums.sgst.toFixed(2)),
+          parseFloat(t51Sums.igst.toFixed(2)),
+          parseFloat(t51Sums.cess.toFixed(2))
+        ];
       }
     }
   });
@@ -241,9 +280,10 @@ function recalculateD6Formulas() {
   // Row 23: Total Duties/Taxes Paid (21 + 22)
   const itc = v["Total Input Tax Credit Utilised (15 to 20)"];
   const cash = v["Payment through Cash Ledger"];
+  const payable = v["Total Duties/Taxes Payable (5+6+7+13)"];
   v["Total Duties/Taxes Paid (21 + 22)"] = [
-    0.00, // Taxable
-    0.00, // Excise/VAT
+    0.00,
+    0.00,
     parseFloat((itc[2] + cash[2]).toFixed(2)),
     parseFloat((itc[3] + cash[3]).toFixed(2)),
     parseFloat((itc[4] + cash[4]).toFixed(2)),
@@ -251,11 +291,10 @@ function recalculateD6Formulas() {
   ];
   
   // Row 32: Difference between Taxes Paid and Payable (Row 14 - Row 23)
-  const payable = v["Total Duties/Taxes Payable (5+6+7+13)"];
   const paid = v["Total Duties/Taxes Paid (21 + 22)"];
   v["Difference between Taxes Paid and Payable (Row 14 - Row 23)"] = [
-    parseFloat((payable[0]).toFixed(2)),
-    parseFloat((payable[1]).toFixed(2)),
+    0.00,
+    0.00,
     parseFloat((payable[2] - paid[2]).toFixed(2)),
     parseFloat((payable[3] - paid[3]).toFixed(2)),
     parseFloat((payable[4] - paid[4]).toFixed(2)),
@@ -303,10 +342,276 @@ function groupPdfTextIntoLines(items) {
 
 // Parse GSTR-3B PDF Content and extract Table 3.1 & 6.1
 async function parseGstr3bPdf(arrayBuffer, filename) {
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdf = await loadingTask.promise;
+  
+  let allLines = [];
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent();
+    const pageLines = groupPdfTextIntoLines(textContent.items);
+    allLines = allLines.concat(pageLines);
+  }
+  
+  // Heuristic parsing of lines
+  const data = {
+    "3.1(a)": { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+    "3.1(b)": { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+    "3.1(c)": { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+    "3.1(d)": { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+    "3.1(e)": { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+    "3.1.1(i)": { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+    "3.1.1(ii)": { taxable: 0.00, igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 }
+  };
+  
+  const payment = {
+    itc: {
+      igst: { igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+      cgst: { igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+      sgst: { igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+      cess: { igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 }
+    },
+    cash: { igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 }
+  };
+
+  const t51 = {
+    interest: { igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 },
+    latefee: { igst: 0.00, cgst: 0.00, sgst: 0.00, cess: 0.00 }
+  };
+  
+  let period = "Unknown Period";
+  
+  // Search for Period Name e.g. "April 2025" or "May 2025"
+  const monthRegex = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s*20\d{2}\b/i;
+  for (let line of allLines) {
+    const match = line.match(monthRegex);
+    if (match) {
+      period = match[0];
+      break;
+    }
+  }
+  
+  // If period is not found, try parsing it from the filename using multiple patterns
+  if (period === "Unknown Period") {
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    
+    // Pattern 1: _YYYY_MM or _20YY_MM e.g. _2025_04
+    let fileMatch = filename.match(/_(20\d{2})_(\d{2})/);
+    if (fileMatch) {
+      const year = fileMatch[1];
+      const monthIdx = parseInt(fileMatch[2]) - 1;
+      if (monthIdx >= 0 && monthIdx < 12) period = months[monthIdx] + " " + year;
+    }
+    
+    // Pattern 2: _MMYYYY e.g. _012025
+    if (period === "Unknown Period") {
+      fileMatch = filename.match(/_(\d{2})(20\d{2})/);
+      if (fileMatch) {
+        const year = fileMatch[2];
+        const monthIdx = parseInt(fileMatch[1]) - 1;
+        if (monthIdx >= 0 && monthIdx < 12) period = months[monthIdx] + " " + year;
+      }
+    }
+    
+    // Pattern 3: _YYYYMM e.g. _202501
+    if (period === "Unknown Period") {
+      fileMatch = filename.match(/_(20\d{2})(\d{2})/);
+      if (fileMatch) {
+        const year = fileMatch[1];
+        const monthIdx = parseInt(fileMatch[2]) - 1;
+        if (monthIdx >= 0 && monthIdx < 12) period = months[monthIdx] + " " + year;
+      }
+    }
+    
+    // Pattern 4: _MM_YYYY e.g. _01_2025
+    if (period === "Unknown Period") {
+      fileMatch = filename.match(/_(\d{2})_(20\d{2})/);
+      if (fileMatch) {
+        const year = fileMatch[2];
+        const monthIdx = parseInt(fileMatch[1]) - 1;
+        if (monthIdx >= 0 && monthIdx < 12) period = months[monthIdx] + " " + year;
+      }
+    }
+  }
+
+  // Helper to clean and parse a token to float
+  const cleanAndParseFloat = (token) => {
+    if (token === null || token === undefined) return 0.00;
+    // 1. Convert the value to a string
+    let t = String(token);
+    
+    // 2. Remove all commas (',') and empty spaces
+    t = t.replace(/,/g, '').replace(/\s/g, '').trim();
+    
+    // If the cell value is empty, a hyphen ('-'), 'Nil', or 'N/A', replace it entirely with '0'
+    let tLower = t.toLowerCase();
+    if (t === "" || t === "-" || t === "—" || tLower === "nil" || tLower === "n/a" || tLower === "na" || tLower === "none" || tLower === "nan") {
+      t = "0";
+    }
+    
+    // Strip out currency symbols if any
+    t = t.replace(/[₹$€£]/g, '');
+    if (t === "" || t === "-") {
+      t = "0";
+    }
+    
+    // 3. Cast the cleaned string into a float data type
+    let val = parseFloat(t);
+    return isNaN(val) ? 0.00 : parseFloat(val.toFixed(2));
+  };
+
+  // Helper to extract N numeric columns from a line
+  const extractColumnsFromLine = (lineText, expectedCount) => {
+    let tokens = lineText.trim().split(/\s+/).filter(t => t.length > 0);
+    
+    const mergedTokens = [];
+    for (let i = 0; i < tokens.length; i++) {
+      let current = tokens[i];
+      
+      while (i + 1 < tokens.length) {
+        let next = tokens[i + 1];
+        let cleanCurrent = current.replace(/[₹$€£\s]/g, '');
+        let cleanNext = next.replace(/[₹$€£\s]/g, '');
+        
+        let endsWithSplitChar = /[,.]$/.test(cleanCurrent);
+        let startsWithSplitChar = /^\./.test(cleanNext);
+        
+        if (endsWithSplitChar || startsWithSplitChar) {
+          current = current + next;
+          i++;
+          continue;
+        }
+        break;
+      }
+      mergedTokens.push(current);
+    }
+    
+    tokens = mergedTokens;
+    
+    // Fallback: Cess omitted in 3.1
+    if (expectedCount === 5 && tokens.length === 4) {
+      let allValid = true;
+      for (let token of tokens) {
+        let cleaned = token.replace(/[₹$€£,\s]/g, '').toLowerCase();
+        if (isNaN(parseFloat(cleaned)) && 
+            cleaned !== "" && 
+            cleaned !== "-" && 
+            cleaned !== "nil" && 
+            cleaned !== "n/a") {
+          allValid = false;
+          break;
+        }
+      }
+      if (allValid) {
+        tokens.push("0.00");
+      }
+    }
+    
+    // Fallback: Cess ITC omitted in 6.1
+    if (expectedCount === 6 && tokens.length === 5) {
+      let allValid = true;
+      for (let token of tokens) {
+        let cleaned = token.replace(/[₹$€£,\s]/g, '').toLowerCase();
+        if (isNaN(parseFloat(cleaned)) && 
+            cleaned !== "" && 
+            cleaned !== "-" && 
+            cleaned !== "nil" && 
+            cleaned !== "n/a") {
+          allValid = false;
+          break;
+        }
+      }
+      if (allValid) {
+        tokens.splice(4, 0, "0.00");
+      }
+    }
+    
+    if (tokens.length < expectedCount) {
+      return null;
+    }
+    
+    const lastTokens = tokens.slice(-expectedCount);
+    
+    let validCount = 0;
+    const parsedNums = [];
+    
+    for (let token of lastTokens) {
+      let cleaned = token.replace(/[₹$€£,\s]/g, '').toLowerCase();
+      if (!isNaN(parseFloat(cleaned)) || 
+          cleaned === "" || 
+          cleaned === "-" || 
+          cleaned === "nil" || 
+          cleaned === "n/a" || 
+          cleaned === "none" || 
+          cleaned === "nan") {
+        validCount++;
+      }
+      parsedNums.push(cleanAndParseFloat(token));
+    }
+    
+    if (validCount >= expectedCount - 1) {
+      return parsedNums;
+    }
+    return null;
+  };
+
+  const extractNumbers = (startIdx, expectedCount) => {
+    for (let offset = 0; offset <= 2; offset++) {
+      if (startIdx + offset < allLines.length) {
+        const lineText = allLines[startIdx + offset];
+        const lowerLine = lineText.toLowerCase();
+        
+        // Only check keyword skip filters if we are looking at subsequent lines (offset > 0).
+        // This ensures we don't skip the row itself when descriptions and numbers are on the same line.
+        if (offset > 0) {
+          if (lowerLine.includes("nature of supplies") || 
+              lowerLine.includes("taxable value") || 
+              lowerLine.includes("integrated tax") || 
+              lowerLine.includes("central tax") || 
+              lowerLine.includes("state/ut tax")) {
+            continue; 
+          }
+          
+          if (lowerLine.includes("total") || 
+              lowerLine.includes("grand total") || 
+              lowerLine.includes("carried forward") || 
+              lowerLine.includes("brought forward") || 
+              lowerLine.includes("subtotal") || 
+              lowerLine.includes("sub-total")) {
+            continue;
+          }
+        }
+        
+        const nums = extractColumnsFromLine(lineText, expectedCount);
+        if (nums) {
+          return nums;
+        }
+      }
+    }
+    return null;
+  };
+
   // Parse Table 3.1 rows
   for (let idx = 0; idx < allLines.length; idx++) {
     const line = allLines[idx];
     const cleanLine = line.toLowerCase().replace(/\s+/g, ' ');
+    
+    if (cleanLine.includes("total") || 
+        cleanLine.includes("grand total") || 
+        cleanLine.includes("carried forward") || 
+        cleanLine.includes("brought forward") || 
+        cleanLine.includes("subtotal") || 
+        cleanLine.includes("sub-total")) {
+      continue;
+    }
+    
+    if (cleanLine.includes("nature of supplies") || 
+        cleanLine.includes("taxable value") || 
+        cleanLine.includes("description") || 
+        cleanLine.includes("tax payable")) {
+      continue;
+    }
+    
     let classification = null;
     
     if (cleanLine.includes('(a) outward taxable') || (cleanLine.includes('(a)') && cleanLine.includes('other than zero'))) {
@@ -326,77 +631,121 @@ async function parseGstr3bPdf(arrayBuffer, filename) {
     }
     
     if (classification) {
-      // Extract numeric components
-      let matches = line.match(/-?[\d,]+\.\d{2}/g) || [];
-      let nums = matches.map(m => parseFloat(m.replace(/,/g, '')));
-      
-      // Lookahead up to 2 lines if numbers were not printed on same line
-      if (nums.length < 4) {
-        for (let offset = 1; offset <= 2; offset++) {
-          if (idx + offset < allLines.length) {
-            const nextLine = allLines[idx + offset];
-            const nextMatches = nextLine.match(/-?[\d,]+\.\d{2}/g) || [];
-            if (nextMatches.length >= 4) {
-              nums = nextMatches.map(m => parseFloat(m.replace(/,/g, '')));
-              break;
-            }
-          }
-        }
-      }
-      
-      if (nums.length >= 4) {
-        while (nums.length < 5) nums.push(0);
+      const nums = extractNumbers(idx, 5);
+      if (nums && nums.length >= 4) {
+        while (nums.length < 5) nums.push(0.00);
         data[classification] = {
           taxable: nums[0],
           igst: nums[1],
           cgst: nums[2],
           sgst: nums[3],
-          cess: nums[4] || 0
+          cess: nums[4] || 0.00
         };
       }
     }
     
     // Parse Table 6.1 (Payment of Tax)
-    if (cleanLine.includes('paid through itc') || cleanLine.includes('6.1 payment of tax')) {
-      // Search the next lines for Payment through ITC & Tax paid in cash
-      for (let offset = 1; offset <= 8; offset++) {
-        if (idx + offset < allLines.length) {
-          const checkLine = allLines[idx + offset];
-          const checkClean = checkLine.toLowerCase();
-          
-          if (checkClean.includes('paid through itc') || checkClean.includes('itc utilisation')) {
-            const matches = checkLine.match(/-?[\d,]+\.\d{2}/g) || [];
-            const nums = matches.map(m => parseFloat(m.replace(/,/g, '')));
-            if (nums.length >= 4) {
-              payment.itc = { igst: nums[0], cgst: nums[1], sgst: nums[2], cess: nums[3] || 0 };
-            }
-          } else if (checkClean.includes('paid in cash') || checkClean.includes('cash ledger')) {
-            const matches = checkLine.match(/-?[\d,]+\.\d{2}/g) || [];
-            const nums = matches.map(m => parseFloat(m.replace(/,/g, '')));
-            if (nums.length >= 4) {
-              payment.cash = { igst: nums[0], cgst: nums[1], sgst: nums[2], cess: nums[3] || 0 };
-            }
-          }
+    let isT61Row = false;
+    let t61Type = null;
+    const cleanWords = cleanLine.split(/\s+/).filter(w => w.length > 0);
+    if (cleanWords.length > 0) {
+      const firstWord = cleanWords[0];
+      if (firstWord.startsWith('integrated') || firstWord.startsWith('igst')) {
+        isT61Row = true;
+        t61Type = 'igst';
+      } else if (firstWord.startsWith('central') || firstWord.startsWith('cgst')) {
+        isT61Row = true;
+        t61Type = 'cgst';
+      } else if (firstWord.startsWith('state') || firstWord.startsWith('sgst')) {
+        isT61Row = true;
+        t61Type = 'sgst';
+      } else if (firstWord.startsWith('cess')) {
+        if (!cleanLine.includes('paid through itc') && !cleanLine.includes('itc utilisation') && !cleanLine.includes('cash')) {
+          isT61Row = true;
+          t61Type = 'cess';
         }
+      }
+    }
+    
+    if (isT61Row && t61Type) {
+      let nums = extractNumbers(idx, 10);
+      if (!nums) nums = extractNumbers(idx, 8);
+      if (!nums) nums = extractNumbers(idx, 6);
+      
+      if (nums) {
+        if (nums.length >= 8) {
+          payment.itc[t61Type] = {
+            igst: nums[3],
+            cgst: nums[4],
+            sgst: nums[5],
+            cess: nums[6]
+          };
+          payment.cash[t61Type] = nums[7];
+        } else {
+          payment.itc[t61Type] = {
+            igst: nums[1],
+            cgst: nums[2],
+            sgst: nums[3],
+            cess: nums[4]
+          };
+          payment.cash[t61Type] = nums[5];
+        }
+      }
+    }
+    
+    if (cleanLine.includes('paid through itc') || cleanLine.includes('itc utilisation')) {
+      const nums = extractNumbers(idx, 4);
+      if (nums && nums.length >= 4) {
+        payment.itc.igst.igst = nums[0];
+        payment.itc.cgst.cgst = nums[1];
+        payment.itc.sgst.sgst = nums[2];
+        payment.itc.cess.cess = nums[3] || 0.00;
+      }
+    } else if (cleanLine.includes('paid in cash') || cleanLine.includes('cash ledger') || cleanLine.includes('net liability discharged')) {
+      const nums = extractNumbers(idx, 4);
+      if (nums && nums.length >= 4) {
+        payment.cash = { igst: nums[0], cgst: nums[1], sgst: nums[2], cess: nums[3] || 0.00 };
+      }
+    } else if (cleanLine.includes('interest') && !cleanLine.includes('late fee') && !cleanLine.includes('penalty')) {
+      const nums = extractNumbers(idx, 4);
+      if (nums && nums.length >= 4) {
+        t51.interest = { igst: nums[0], cgst: nums[1], sgst: nums[2], cess: nums[3] || 0.00 };
+      }
+    } else if (cleanLine.includes('late fee') || cleanLine.includes('latefee')) {
+      const nums = extractNumbers(idx, 4);
+      if (nums && nums.length >= 4) {
+        t51.latefee = { igst: nums[0], cgst: nums[1], sgst: nums[2], cess: nums[3] || 0.00 };
       }
     }
   }
   
-  // If payment details weren't extracted, auto-balance it so reconciliation is clean
-  if (payment.itc.igst === 0 && payment.itc.cgst === 0 && payment.itc.sgst === 0) {
-    payment.itc = {
-      igst: data["3.1(a)"].igst + data["3.1(b)"].igst + data["3.1(d)"].igst,
-      cgst: data["3.1(a)"].cgst + data["3.1(b)"].cgst + data["3.1(d)"].cgst,
-      sgst: data["3.1(a)"].sgst + data["3.1(b)"].sgst + data["3.1(d)"].sgst,
-      cess: data["3.1(a)"].cess + data["3.1(b)"].cess + data["3.1(d)"].cess
-    };
+  const sumITC = (payment.itc.igst.igst + payment.itc.cgst.cgst + payment.itc.sgst.sgst);
+  if (sumITC === 0) {
+    payment.itc.igst.igst = Math.round((data["3.1(a)"].igst + data["3.1(b)"].igst + data["3.1(d)"].igst) * 100) / 100;
+    payment.itc.cgst.cgst = Math.round((data["3.1(a)"].cgst + data["3.1(b)"].cgst + data["3.1(d)"].cgst) * 100) / 100;
+    payment.itc.sgst.sgst = Math.round((data["3.1(a)"].sgst + data["3.1(b)"].sgst + data["3.1(d)"].sgst) * 100) / 100;
+    payment.itc.cess.cess = Math.round((data["3.1(a)"].cess + data["3.1(b)"].cess + data["3.1(d)"].cess) * 100) / 100;
   }
   
+  // Save extracted text and values to logs for debugging
+  if (!window.appState.extractedTextLogs) {
+    window.appState.extractedTextLogs = [];
+  }
+  window.appState.extractedTextLogs.push({
+    filename: filename,
+    lines: allLines,
+    parsedData: JSON.parse(JSON.stringify(data)),
+    parsedPayment: JSON.parse(JSON.stringify(payment)),
+    parsedT51: JSON.parse(JSON.stringify(t51)),
+    period: period
+  });
+
   return {
     period,
     filename,
     data,
-    payment
+    payment,
+    t51
   };
 }
 
@@ -564,6 +913,147 @@ function renderAllViews() {
   renderExtractedTextLogs();
 }
 
+// Render the debug / values fetched tab showing raw and parsed data
+function renderExtractedTextLogs() {
+  const container = document.getElementById('debug-logs-container');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  const logs = window.appState.extractedTextLogs || [];
+  if (logs.length === 0) {
+    container.innerHTML = '<div class="empty-state">No PDF files parsed yet. Upload files or load sample data in the sidebar.</div>';
+    return;
+  }
+  
+  logs.forEach(log => {
+    const fileCard = document.createElement('div');
+    fileCard.className = 'card';
+    fileCard.style.backgroundColor = 'rgba(11, 19, 43, 0.4)';
+    fileCard.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+    fileCard.style.padding = '1.25rem';
+    fileCard.style.marginBottom = '1.5rem';
+    
+    // Header
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.style.marginBottom = '1rem';
+    header.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
+    header.style.paddingBottom = '0.5rem';
+    header.innerHTML = `
+      <h4 style="color: var(--accent-cyan); margin: 0;"><i class="fa-solid fa-file-pdf"></i> ${log.filename} (${log.period})</h4>
+    `;
+    fileCard.appendChild(header);
+    
+    // Parsed Data grid
+    const parsedDataTitle = document.createElement('div');
+    parsedDataTitle.style.fontWeight = 'bold';
+    parsedDataTitle.style.fontSize = '0.85rem';
+    parsedDataTitle.style.color = 'var(--accent-blue)';
+    parsedDataTitle.style.marginBottom = '0.5rem';
+    parsedDataTitle.innerText = "Parsed Financial Values (GSTR-3B Table 3.1):";
+    fileCard.appendChild(parsedDataTitle);
+    
+    const table = document.createElement('table');
+    table.className = 'data-table';
+    table.style.marginBottom = '1.5rem';
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Classification</th>
+          <th class="text-right">Taxable Value</th>
+          <th class="text-right">IGST</th>
+          <th class="text-right">CGST</th>
+          <th class="text-right">SGST</th>
+          <th class="text-right">Cess</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Object.keys(log.parsedData).map(key => {
+          const vals = log.parsedData[key];
+          return `
+            <tr>
+              <td><span class="badge badge-blue">${key}</span></td>
+              <td class="text-right">${formatCurrency(vals.taxable)}</td>
+              <td class="text-right">${formatCurrency(vals.igst)}</td>
+              <td class="text-right">${formatCurrency(vals.cgst)}</td>
+              <td class="text-right">${formatCurrency(vals.sgst)}</td>
+              <td class="text-right">${formatCurrency(vals.cess)}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    `;
+    fileCard.appendChild(table);
+    
+    // Parsed Payment grid (Table 6.1)
+    const paymentDataTitle = document.createElement('div');
+    paymentDataTitle.style.fontWeight = 'bold';
+    paymentDataTitle.style.fontSize = '0.85rem';
+    paymentDataTitle.style.color = 'var(--accent-cyan)';
+    paymentDataTitle.style.marginBottom = '0.5rem';
+    paymentDataTitle.innerText = "Parsed Payment Values (GSTR-3B Table 6.1):";
+    fileCard.appendChild(paymentDataTitle);
+    
+    const pTable = document.createElement('table');
+    pTable.className = 'data-table';
+    pTable.style.marginBottom = '1.5rem';
+    pTable.innerHTML = `
+      <thead>
+        <tr>
+          <th>Payment Type</th>
+          <th class="text-right">IGST</th>
+          <th class="text-right">CGST</th>
+          <th class="text-right">SGST</th>
+          <th class="text-right">Cess</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-teal">ITC Utilised</span></td>
+          <td class="text-right">${formatCurrency((log.parsedPayment.itc.igst.igst || 0) + (log.parsedPayment.itc.cgst.igst || 0) + (log.parsedPayment.itc.sgst.igst || 0) + (log.parsedPayment.itc.cess.igst || 0))}</td>
+          <td class="text-right">${formatCurrency((log.parsedPayment.itc.igst.cgst || 0) + (log.parsedPayment.itc.cgst.cgst || 0) + (log.parsedPayment.itc.sgst.cgst || 0) + (log.parsedPayment.itc.cess.cgst || 0))}</td>
+          <td class="text-right">${formatCurrency((log.parsedPayment.itc.igst.sgst || 0) + (log.parsedPayment.itc.cgst.sgst || 0) + (log.parsedPayment.itc.sgst.sgst || 0) + (log.parsedPayment.itc.cess.sgst || 0))}</td>
+          <td class="text-right">${formatCurrency((log.parsedPayment.itc.igst.cess || 0) + (log.parsedPayment.itc.cgst.cess || 0) + (log.parsedPayment.itc.sgst.cess || 0) + (log.parsedPayment.itc.cess.cess || 0))}</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-purple">Paid in Cash</span></td>
+          <td class="text-right">${formatCurrency(log.parsedPayment.cash.igst)}</td>
+          <td class="text-right">${formatCurrency(log.parsedPayment.cash.cgst)}</td>
+          <td class="text-right">${formatCurrency(log.parsedPayment.cash.sgst)}</td>
+          <td class="text-right">${formatCurrency(log.parsedPayment.cash.cess)}</td>
+        </tr>
+      </tbody>
+    `;
+    fileCard.appendChild(pTable);
+    
+    // Raw Text Lines
+    const rawTextTitle = document.createElement('div');
+    rawTextTitle.style.fontWeight = 'bold';
+    rawTextTitle.style.fontSize = '0.85rem';
+    rawTextTitle.style.color = 'var(--text-muted)';
+    rawTextTitle.style.marginBottom = '0.5rem';
+    rawTextTitle.innerText = "Raw Text Extracted Lines:";
+    fileCard.appendChild(rawTextTitle);
+    
+    const pre = document.createElement('pre');
+    pre.style.maxHeight = '200px';
+    pre.style.overflowY = 'auto';
+    pre.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
+    pre.style.padding = '0.75rem';
+    pre.style.borderRadius = 'var(--border-radius-sm)';
+    pre.style.fontSize = '0.75rem';
+    pre.style.color = 'var(--text-secondary)';
+    pre.style.fontFamily = 'monospace';
+    pre.style.whiteSpace = 'pre-wrap';
+    pre.innerText = log.lines.join('\n');
+    fileCard.appendChild(pre);
+    
+    container.appendChild(fileCard);
+  });
+}
+
 // Render the consolidated raw table
 function renderRawTable() {
   const tbody = document.getElementById('raw-table-body');
@@ -722,6 +1212,53 @@ function renderPivot(containerId, pivotData, title, badgeClass) {
   container.appendChild(table);
 }
 
+// Helper to determine if a cell is applicable
+function isCellApplicable(rowLabel, colIdx) {
+  const isExciseOrVatRow = [
+    "Domestic", "Export", "Stock Transfers (Net)", "Others, if any", "Total Excise Duty (1 to 4)",
+    "VAT, CST, Cess etc.", "Other State Taxes, if any"
+  ].includes(rowLabel);
+  
+  const isPaymentRow = [
+    "CGST/ CENVAT", "SGST / UTGST/ VAT", "IGST", "Cess", "Transitional Credit", "Others, if any, specify",
+    "Total Input Tax Credit Utilised (15 to 20)", "Payment through Cash Ledger", "Total Duties/Taxes Paid (21 + 22)",
+    "Difference between Taxes Paid and Payable (Row 14 - Row 23)", "Interest/Penalty/Fines Paid"
+  ].includes(rowLabel);
+
+  if (isExciseOrVatRow) {
+    return (colIdx === 0 || colIdx === 1);
+  }
+  
+  if (isPaymentRow) {
+    return (colIdx >= 2 && colIdx <= 5);
+  }
+  
+  return true;
+}
+
+// Format values for the D6 matrix visual display
+function formatD6Value(val, rowLabel, colIdx) {
+  if (val === null || val === undefined || isNaN(val)) return "";
+  
+  // For Difference Row, if difference is zero but payable/paid was non-zero, show "0"
+  if (rowLabel === "Difference between Taxes Paid and Payable (Row 14 - Row 23)") {
+    const payable = window.appState.d6Values["Total Duties/Taxes Payable (5+6+7+13)"][colIdx];
+    const paid = window.appState.d6Values["Total Duties/Taxes Paid (21 + 22)"][colIdx];
+    if (Math.abs(val) < 0.01) {
+      return (payable > 0 || paid > 0) ? "0" : "-";
+    }
+  }
+  
+  if (Math.abs(val) < 0.01) return "-";
+  
+  const isNeg = val < 0;
+  const rounded = Math.round(Math.abs(val));
+  if (rounded === 0) return "-";
+  
+  const formatted = rounded.toLocaleString('en-US');
+  return isNeg ? `(${formatted})` : formatted;
+}
+
 // Render the interactive D6 Reconciliation Matrix
 function renderD6Matrix() {
   const container = document.getElementById('d6-matrix-container');
@@ -786,15 +1323,10 @@ function renderD6Matrix() {
     
     for (let i = 0; i < 6; i++) {
       const td = document.createElement('td');
-      td.className = 'text-right';
       
-      // Payment rows: column 0 (Taxable) and 1 (Excise/VAT) are disabled/greyed
-      const isPaymentRow = (row.category === 'payment' || row.type === 'formula_itc' || row.type === 'formula_paid');
-      const isDisabledCol = isPaymentRow && (i === 0 || i === 1);
-      
-      if (isDisabledCol) {
+      if (!isCellApplicable(row.label, i)) {
         td.className = 'text-center cell-disabled';
-        td.innerText = "—";
+        td.innerText = "";
       } else if (row.type === 'data') {
         // Editable data row
         const isEditing = window.appState.activeEditingCell && 
@@ -831,7 +1363,7 @@ function renderD6Matrix() {
           setTimeout(() => input.focus(), 10);
         } else {
           td.className = 'cell-editable text-right';
-          td.innerText = formatCurrency(vals[i]);
+          td.innerText = formatD6Value(vals[i], row.label, i);
           td.onclick = () => {
             window.appState.activeEditingCell = { label: row.label, colIdx: i };
             renderD6Matrix();
@@ -844,7 +1376,7 @@ function renderD6Matrix() {
         } else {
           td.className = 'cell-formula text-right';
         }
-        td.innerText = formatCurrency(vals[i]);
+        td.innerText = formatD6Value(vals[i], row.label, i);
       }
       
       tr.appendChild(td);
@@ -1113,15 +1645,20 @@ window.exportExcelReport = function() {
     
     if (row.type === 'header' || row.type === 'subheader') {
       d6RowsAoa.push([row.sl, row.label, "", "", "", "", "", ""]);
-    } else if (row.type === 'data') {
-      // payment rows clear out cols C(index 2) & D(index 3)
-      const isPayment = (row.category === 'payment');
-      const val0 = isPayment ? "" : vals[0];
-      const val1 = isPayment ? "" : vals[1];
-      d6RowsAoa.push([row.sl, row.label, val0, val1, vals[2], vals[3], vals[4], vals[5]]);
     } else {
-      // Formula Row placeholders - will insert formula objects in next step
-      d6RowsAoa.push([row.sl, row.label, 0, 0, 0, 0, 0, 0]);
+      const rowVals = [row.sl, row.label];
+      for (let i = 0; i < 6; i++) {
+        if (isCellApplicable(row.label, i)) {
+          if (row.type === 'data') {
+            rowVals.push(vals[i]);
+          } else {
+            rowVals.push(0);
+          }
+        } else {
+          rowVals.push("");
+        }
+      }
+      d6RowsAoa.push(rowVals);
     }
   });
   
@@ -1158,37 +1695,33 @@ window.exportExcelReport = function() {
     colLetters.forEach((colLetter, colIdx) => {
       const cellRef = `${colLetter}${excelRowIndex}`;
       
+      if (!isCellApplicable(row.label, colIdx)) {
+        wsD6[cellRef] = { t: 's', v: "" };
+        return;
+      }
+      
       if (row.type === 'formula_sum') {
         const [startIdx, endIdx] = row.range;
         const startRow = startIdx + headerOffset;
         const endRow = endIdx + headerOffset;
-        wsD6[cellRef] = { t: 'n', f: `SUM(${colLetter}${startRow}:${colLetter}${endRow})`, z: '₹#,##0.00' };
-        
-        // Blank out taxable/excise columns for ITC totals
-        if (row.label.includes("Credit Utilised") && (colLetter === 'C' || colLetter === 'D')) {
-          wsD6[cellRef] = { t: 's', v: "" };
-        }
+        wsD6[cellRef] = { t: 'n', f: `SUM(${colLetter}${startRow}:${colLetter}${endRow})`, z: '#,##0;(#,##0);"-"' };
       } 
       else if (row.type === 'formula_custom_payable') {
         // Total Excise(Row 9) + VAT(Row 10) + State(Row 11) + GST(Row 18)
-        wsD6[cellRef] = { t: 'n', f: `${colLetter}9+${colLetter}10+${colLetter}11+${colLetter}18`, z: '₹#,##0.00' };
+        wsD6[cellRef] = { t: 'n', f: `${colLetter}9+${colLetter}10+${colLetter}11+${colLetter}18`, z: '#,##0;(#,##0);"-"' };
       } 
       else if (row.type === 'formula_custom_paid') {
         // Total ITC Utilised (Row 28) + Cash Ledger (Row 29)
-        wsD6[cellRef] = { t: 'n', f: `${colLetter}28+${colLetter}29`, z: '₹#,##0.00' };
-        
-        if (colLetter === 'C' || colLetter === 'D') {
-          wsD6[cellRef] = { t: 's', v: "" };
-        }
+        wsD6[cellRef] = { t: 'n', f: `${colLetter}28+${colLetter}29`, z: '#,##0;(#,##0);"-"' };
       } 
       else if (row.type === 'formula_diff') {
         // Payable (Row 19) - Paid (Row 30)
-        wsD6[cellRef] = { t: 'n', f: `${colLetter}19-${colLetter}30`, z: '₹#,##0.00' };
+        wsD6[cellRef] = { t: 'n', f: `${colLetter}19-${colLetter}30`, z: '#,##0;(#,##0);"-"' };
       } 
       else {
-        // Data rows: apply rupee format
+        // Data rows: apply integer format
         if (wsD6[cellRef] && typeof wsD6[cellRef].v === 'number') {
-          wsD6[cellRef].z = '₹#,##0.00';
+          wsD6[cellRef].z = '#,##0;(#,##0);"-"';
         }
       }
     });
@@ -1235,13 +1768,13 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       dropzone.classList.remove('dragover');
       if (e.dataTransfer.files.length > 0) {
-        handleUploadedFiles(e.dataTransfer.files);
+        window.handleUploadedFiles(e.dataTransfer.files);
       }
     };
     
     fileInput.onchange = (e) => {
       if (e.target.files.length > 0) {
-        handleUploadedFiles(e.target.files);
+        window.handleUploadedFiles(e.target.files);
       }
     };
   }
@@ -1251,7 +1784,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // File upload handler
-async function handleUploadedFiles(fileList) {
+window.handleUploadedFiles = async function(fileList) {
   window.appState.isProcessing = true;
   updateProgressUI('Analyzing files...', 5);
   
